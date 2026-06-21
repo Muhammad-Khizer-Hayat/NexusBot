@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+nexusbot.db
+node_modules/
+backend/uploads/
+backend/static/images/
+.vscode/
