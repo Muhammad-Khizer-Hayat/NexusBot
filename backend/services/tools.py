@@ -87,7 +87,7 @@ def web_search(query: str, max_results: int = 6) -> str:
             output += "\n=== Detailed content ===\n\n" + "\n\n".join(scraped)
         return output
     except Exception as e:
-        return f"Search failed: {str(e)}"
+        return f"Search failed: {str(e)}" 
     
     #---------------------Scrap Url-----------------------
 
