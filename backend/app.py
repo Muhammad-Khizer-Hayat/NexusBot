@@ -13,7 +13,7 @@ from routes.chat import router as chat_router
 from routes.auth import router as auth_router
 
 app_dir      = os.path.dirname(os.path.abspath(__file__))
-frontend_dir = os.path.join(os.path.dirname(app_dir), "frontend")
+frontend_dir = os.path.join(app_dir, "frontend")
 
 def create_app() -> FastAPI:
     app = FastAPI(title="NexusBot", version="2.0.0")
@@ -61,4 +61,3 @@ app = create_app()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("app:app", host="0.0.0.0", port=port)
-    
