@@ -1,5 +1,5 @@
 const API  = "http://127.0.0.1:8000/api";
-const GCID = "500520820211-55hbpktvcfrmae35ad0783uoqeqb7tui.apps.googleusercontent.com";  // ← Paste your Client ID from Google Cloud Console
+const GCID = "638940044835-k86ur6fbflt4j0dd2v0ne6dv9mmltj71.apps.googleusercontent.com";  // ← Paste your Client ID from Google Cloud Console
 
 const BOT_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22">
   <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="#6c63ff"/>
