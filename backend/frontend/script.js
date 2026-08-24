@@ -1,4 +1,4 @@
-const API  = "http://127.0.0.1:8000/api";
+const API = "https://khizer-nexusbot.up.railway.app/api";
 const GCID = "638940044835-k86ur6fbflt4j0dd2v0ne6dv9mmltj71.apps.googleusercontent.com";  // ← Paste your Client ID from Google Cloud Console
 
 const BOT_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22">
