@@ -419,3 +419,67 @@ body.light-mode .user-bubble { background: linear-gradient(135deg,var(--ac),#4f4
     max-width: 100%;
     height: auto;
 }
+/* ══ CALL BUTTON ═══════════════════════════════════════════════ */
+.call-btn {
+  display:flex;align-items:center;gap:5px;background:var(--sf2);
+  border:1px solid var(--bd);color:var(--tx2);border-radius:20px;
+  padding:4px 10px;font-size:11px;font-family:'Sora',sans-serif;
+  cursor:pointer;transition:all .2s;
+}
+.call-btn:hover { border-color:#22c55e;color:#22c55e; }
+
+/* ══ FULL-SCREEN CALL UI ═══════════════════════════════════════ */
+.call-screen {
+  position:fixed;inset:0;z-index:1000;
+  background:radial-gradient(circle at 50% 30%, #1a1a2e, #0a0a0f 70%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:#fff;
+}
+.call-top { position:absolute;top:24px;left:0;right:0;text-align:center; }
+.call-brand { font-size:16px;font-weight:600;color:rgba(255,255,255,.7); }
+
+.call-orb-wrap { display:flex;align-items:center;justify-content:center;margin-bottom:32px; }
+.call-orb {
+  width:140px;height:140px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #8b85ff, #6c63ff 60%, #4f46e5);
+  box-shadow:0 0 60px rgba(108,99,255,.5);
+  transition:transform .25s ease, box-shadow .25s ease;
+}
+.call-orb.listening { animation:orbPulseListen 1.6s ease-in-out infinite; }
+.call-orb.speaking  { animation:orbPulseSpeak 0.9s ease-in-out infinite; }
+.call-orb.thinking  { animation:orbSpin 1.4s linear infinite; opacity:.85; }
+
+@keyframes orbPulseListen {
+  0%,100% { transform:scale(1); box-shadow:0 0 60px rgba(108,99,255,.5); }
+  50%     { transform:scale(1.08); box-shadow:0 0 90px rgba(108,99,255,.75); }
+}
+@keyframes orbPulseSpeak {
+  0%,100% { transform:scale(1.02); box-shadow:0 0 70px rgba(139,133,255,.7); }
+  50%     { transform:scale(1.14); box-shadow:0 0 110px rgba(139,133,255,.9); }
+}
+@keyframes orbSpin {
+  0%   { filter:hue-rotate(0deg); }
+  100% { filter:hue-rotate(45deg); }
+}
+
+.call-status {
+  font-size:15px;font-weight:500;color:rgba(255,255,255,.85);margin-bottom:10px;
+}
+.call-transcript {
+  max-width:480px;text-align:center;font-size:13px;color:rgba(255,255,255,.5);
+  min-height:20px;padding:0 24px;line-height:1.6;
+}
+.call-end-btn {
+  position:absolute;bottom:56px;
+  width:60px;height:60px;border-radius:50%;
+  background:#f43f5e;border:none;color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(244,63,94,.4);
+  transition:transform .15s;
+}
+.call-end-btn:hover { transform:scale(1.08); }
+
+@media(max-width:768px) {
+  .call-orb { width:110px;height:110px; }
+  .call-transcript { font-size:12px; }
+}

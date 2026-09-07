@@ -1,5 +1,6 @@
 const API = "https://khizer-nexusbot.up.railway.app/api";
-const GCID = "638940044835-k86ur6fbflt4j0dd2v0ne6dv9mmltj71.apps.googleusercontent.com";  // ← Paste your Client ID from Google Cloud Console
+const GCID = "638940044835-59hp6jsabcr9krl8hgennni7ma4tqooh.apps.googleusercontent.com";  // ← Paste your Client ID from Google Cloud Console
+
 
 const BOT_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22">
   <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="#6c63ff"/>
@@ -18,6 +19,7 @@ let isTyping    = false;
 let ttsEnabled  = true;
 let recognition = null;
 let isListening = false;
+
 
 // ══════════════════════════════════════════════════════════════
 // AUTH
@@ -81,8 +83,6 @@ function googleSignIn() {
         showAuthError("Google library not loaded. Check your internet connection and refresh.");
         return;
     }
-
-    // Create a hidden container for the real Google button
     let container = document.getElementById("g-btn-container");
     if (!container) {
         container = document.createElement("div");
@@ -91,7 +91,6 @@ function googleSignIn() {
         document.body.appendChild(container);
     }
     container.innerHTML = "";
-
     google.accounts.id.initialize({
         client_id: GCID,
         callback: async (response) => {
@@ -110,18 +109,10 @@ function googleSignIn() {
         },
         ux_mode: "popup",
     });
-
-    // Render the real Google button (works on localhost unlike prompt())
     google.accounts.id.renderButton(container, {
-        theme: "outline",
-        size: "large",
-        type: "standard",
-        text: "signin_with",
-        shape: "rectangular",
-        width: 280,
+        theme: "outline", size: "large", type: "standard",
+        text: "signin_with", shape: "rectangular", width: 280,
     });
-
-    // Auto-click the rendered button
     setTimeout(() => {
         const btn = container.querySelector("div[role=button]") || container.querySelector("iframe");
         if (btn) btn.click();
@@ -196,7 +187,6 @@ function togglePlusPopup() {
     popup.style.display = isOpen ? "none" : "block";
     btn.classList.toggle("active", !isOpen);
 }
-
 function triggerFileUpload(type) {
     document.getElementById("plus-popup").style.display = "none";
     document.getElementById("plus-btn").classList.remove("active");
@@ -204,7 +194,6 @@ function triggerFileUpload(type) {
     if (type === "image") document.getElementById("input-file-image").click();
     if (type === "pdf")   document.getElementById("input-file-pdf").click();
 }
-
 function handleAnyFile(file) {
     if (!file) return;
     const ext = file.name.split(".").pop().toLowerCase();
@@ -251,7 +240,6 @@ async function handleImageUpload(file) {
         removeTyping(typingId);
         if (data.success) {
             const reply = `## OCR Result — ${data.filename}\n\n${data.text}`;
-            // ← CHANGE: OCR results are text — store normally, not as image
             messages.push({role:"assistant", content: reply});
             appendBubble(reply, "bot", true);
             speak(data.text);
@@ -278,7 +266,6 @@ async function loadSessions() {
     if (sessions.length > 0) { await loadSession(sessions[0].id); }
     else { newChat(); }
 }
-
 async function loadSession(sid) {
     currentSid = sid;
     try {
@@ -292,7 +279,6 @@ async function loadSession(sid) {
     else { messages.forEach(m => appendBubble(m.content, m.role==="user"?"user":"bot", false, m.time||new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}))); box.scrollTop = box.scrollHeight; }
     renderHistory();
 }
-
 function newChat() {
     stopSpeaking();
     if (currentSid) {
@@ -304,7 +290,6 @@ function newChat() {
     renderHistory();
     showWelcome();
 }
-
 async function deleteChat(sid, e) {
     e.stopPropagation();
     await fetch(`${API}/sessions/${sid}`, {method:"DELETE", headers:authH()}).catch(()=>{});
@@ -314,7 +299,6 @@ async function deleteChat(sid, e) {
         else { currentSid = null; newChat(); }
     } else { renderHistory(); }
 }
-
 function renderHistory() {
     const c     = document.getElementById("chat-history");
     const label = c.querySelector(".history-label");
@@ -370,28 +354,24 @@ async function sendMessage() {
     isTyping = true; btn.disabled = true;
     const tid = showTyping();
     try {
-       // Strip base64 image data before sending — prevents "Could not reach server" error
-const safeMessages = messages.map(m => {
-    if (!m.content) return m;
-    // Catch raw base64, IMAGE tags, or the stored placeholder
-    if (m.content.includes("[IMAGE]") || m.content.includes("data:image") || m.content.includes("[Image was generated]")) {
-        return {...m, content: "[Image was generated]"};
-    }
-    // Only truncate truly oversized content (not normal replies)
-    if (m.content.length > 4000) {
-        return {...m, content: m.content.slice(0, 4000)};
-    }
-    return m;
-});
+        const safeMessages = messages.map(m => {
+            if (!m.content) return m;
+            if (m.content.includes("[IMAGE]") || m.content.includes("data:image") || m.content.includes("[Image was generated]")) {
+                return {...m, content: "[Image was generated]"};
+            }
+            if (m.content.length > 4000) {
+                return {...m, content: m.content.slice(0, 4000)};
+            }
+            return m;
+        });
 
-const res = await fetch(`${API}/chat`, {
-    method: "POST", headers: authH(),
-    body: JSON.stringify({messages: safeMessages, session_id: currentSid, stream: true})
-});
+        const res = await fetch(`${API}/chat`, {
+            method: "POST", headers: authH(),
+            body: JSON.stringify({messages: safeMessages, session_id: currentSid, stream: true})
+        });
 
         removeTyping(tid);
 
-        // ── Streaming SSE handler ──────────────────────────────
         const reader  = res.body.getReader();
         const decoder = new TextDecoder();
         let   fullReply = "";
@@ -401,32 +381,24 @@ const res = await fetch(`${API}/chat`, {
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
             const lines = decoder.decode(value).split("\n");
             for (const line of lines) {
                 if (!line.startsWith("data: ")) continue;
                 try {
                     const ev = JSON.parse(line.slice(6));
-
                     if (ev.type === "meta") {
                         meta = ev;
-                        // Create bubble now so tokens stream into it
                         bubbleEl = appendStreamingBubble();
                     }
-
                     if (ev.type === "token") {
                         fullReply += ev.text;
-                        // Only update bubble for non-image content (images stream in chunks)
                         const isImageChunk = fullReply.includes("[IMAGE]");
                         if (bubbleEl && !isImageChunk) updateStreamingBubble(bubbleEl, fullReply);
                         else if (bubbleEl && isImageChunk) {
-                            // Show loading indicator while image chunks arrive
                             bubbleEl.innerHTML = '<div style="padding:16px;text-align:center;color:#aaa;">🎨 Rendering image...</div>';
                         }
                     }
-
                     if (ev.type === "done") {
-                        // Finalise bubble with full markdown render
                         if (bubbleEl) finaliseStreamingBubble(bubbleEl, fullReply);
                     }
                 } catch {}
@@ -434,8 +406,6 @@ const res = await fetch(`${API}/chat`, {
         }
 
         const reply = fullReply || "Sorry, no response.";
-
-        // Always store safe placeholder for images
         const safeReply = (reply.includes("[IMAGE]") || reply.includes("data:image"))
             ? "[Image was generated]"
             : reply;
@@ -462,12 +432,10 @@ function appendStreamingBubble() {
     box.scrollTop = box.scrollHeight;
     return bub;
 }
-
 function updateStreamingBubble(bub, text) {
     if (text.includes('[IMAGE]') || text.includes('[WEATHER_CARD]')) {
         bub.innerHTML = '<span class="stream-cursor">▋</span>';
     } else if (text.includes('```mermaid') || /^\s*(flowchart|sequenceDiagram|classDiagram)/m.test(text)) {
-        // Don't render mermaid mid-stream — wait for done event
         bub.innerHTML = '<div style="padding:12px;color:var(--tx3);font-size:13px;">📊 Building diagram...</div><span class="stream-cursor">▋</span>';
     } else {
         bub.innerHTML = renderMarkdown(text) + '<span class="stream-cursor">▋</span>';
@@ -475,7 +443,6 @@ function updateStreamingBubble(bub, text) {
     const box = document.getElementById("messages");
     box.scrollTop = box.scrollHeight;
 }
-
 function finaliseStreamingBubble(bub, text) {
     const wd = parseWeatherCard(text);
     if (wd) {
@@ -517,19 +484,15 @@ function appendBubble(text, role, scroll=true, msgTime=null, msgTimeFull=null) {
         }
         bub.appendChild(buildFeedbackBar(text));
     } else {
-        // ── User message bubble ───────────────────────────────
         const msgWrap = document.createElement("div");
         msgWrap.className = "user-msg-wrap";
 
-        // Message text — store original text on element for edit
         const msgText = document.createElement("div");
         msgText.className = "bubble user-bubble";
         msgText.textContent = text;
-        msgText.dataset.userText = text;  // store for editMessage
+        msgText.dataset.userText = text;
         msgWrap.appendChild(msgText);
 
-        // Action bar — shows on hover (like Claude)
-        // Use passed msgTime (send time) or current time as fallback
         const _now    = new Date();
         const timeStr = msgTime     || _now.toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit"});
         const timeFull = msgTimeFull || _now.toLocaleString("en-US", {weekday:"short", year:"numeric", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit"});
@@ -538,11 +501,7 @@ function appendBubble(text, role, scroll=true, msgTime=null, msgTimeFull=null) {
         actionBar.className = "user-action-bar";
         actionBar.innerHTML = `
             <span class="msg-time" title="${timeFull}">${timeStr}</span>
-            <button class="ua-btn" title="Edit message" onclick="(function(){
-                const userRows = document.querySelectorAll('.msg-row.user');
-                const idx = Array.from(userRows).indexOf(row_ref);
-                editMessage(idx);
-            })()">
+            <button class="ua-btn" title="Edit message">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -557,9 +516,7 @@ function appendBubble(text, role, scroll=true, msgTime=null, msgTimeFull=null) {
                 Copy
             </button>`;
 
-        // Store row reference for edit button
         const row_ref = row;
-        // Fix edit button to use closure properly
         const editBtn = actionBar.querySelector('button[title="Edit message"]');
         editBtn.onclick = () => {
             const userRows = document.querySelectorAll('.msg-row.user');
@@ -569,7 +526,7 @@ function appendBubble(text, role, scroll=true, msgTime=null, msgTimeFull=null) {
 
         msgWrap.appendChild(actionBar);
         bub.appendChild(msgWrap);
-        bub.className = "user-bubble-outer"; // reset class - styling via inner
+        bub.className = "user-bubble-outer";
     }
     row.appendChild(av); row.appendChild(bub); box.appendChild(row);
     if (scroll) box.scrollTop = box.scrollHeight;
@@ -684,11 +641,9 @@ function buildImageCard(imageUrl) {
     </div>`;
 }
 
-// ── Image error handler — retries then shows open link ──────────
 function handleImgError(img, originalUrl) {
     const retries = parseInt(img.dataset.retries || 0);
     if (retries < 3) {
-        // Retry with cache-busting after short delay
         img.dataset.retries = retries + 1;
         setTimeout(() => {
             const sep = originalUrl.includes("?") ? "&" : "?";
@@ -700,7 +655,6 @@ function handleImgError(img, originalUrl) {
                 <div>Generating image... please wait</div>
                 <div style="font-size:12px;margin-top:6px;opacity:0.6;">Attempt ${retries + 1}/3</div>
             </div>`;
-        // Retry the img after delay
         setTimeout(() => {
             const newImg = document.createElement("img");
             newImg.src = originalUrl + (originalUrl.includes("?") ? "&" : "?") + "_r=" + Date.now();
@@ -711,7 +665,6 @@ function handleImgError(img, originalUrl) {
             img.parentElement.replaceWith((() => { const d = document.createElement("div"); d.style.cssText="position:relative;cursor:pointer;"; d.appendChild(newImg); return d; })());
         }, 2000 * (retries + 1) + 100);
     } else {
-        // All retries failed — show open in new tab button
         img.parentElement.innerHTML = `
             <div style="padding:20px;text-align:center;border-radius:12px;background:#1a1a1a;">
                 <div style="font-size:32px;margin-bottom:8px;">🖼️</div>
@@ -805,24 +758,19 @@ function buildWeatherCard(d) {
 
 // ── Markdown renderer ──────────────────────────────────────────
 function renderMarkdown(text) {
-    // ── Auto-wrap raw mermaid syntax if not already fenced ─────
     const MERMAID_KW = /^[ \t]*(flowchart|sequenceDiagram|classDiagram|erDiagram|gantt|pie|gitGraph|stateDiagram|journey|mindmap)/m;
     if (!text.includes("```mermaid") && MERMAID_KW.test(text)) {
         text = "```mermaid\n" + text.trim() + "\n```";
     }
-    // ← strip markdown images — prevents ![name](url) rendering as <img>
-        text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
-        if (url.startsWith("data:image")) return _;  // keep our own generated images
-        return alt ? `[${alt}]` : "";                // replace external with alt text only
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+        if (url.startsWith("data:image")) return _;
+        return alt ? `[${alt}]` : "";
     });
 
     text = text.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g, (_, lang, code) => {
         const l = lang || "plaintext";
-
-        // ── Mermaid diagram ────────────────────────────────────
         if (l === "mermaid") {
             const id  = "mermaid-" + Math.random().toString(36).slice(2);
-            // Store code in data attribute — avoids HTML entity corruption
             const safe = code.trim().replace(/"/g, "&quot;");
             return `<div class="mermaid-wrap">
                 <div class="mermaid-header">
@@ -832,8 +780,6 @@ function renderMarkdown(text) {
                 <div class="mermaid-container" id="${id}" data-code="${safe}"></div>
             </div>`;
         }
-
-        // ── Regular code block ─────────────────────────────────
         const id = "c" + Math.random().toString(36).slice(2);
         return `<div class="code-block"><div class="code-header"><span>${l}</span><button class="copy-btn" onclick="copyCode('${id}')">Copy</button></div><pre><code id="${id}" class="language-${l}">${escapeHtml(code.trim())}</code></pre></div>`;
     });
@@ -847,7 +793,6 @@ function renderMarkdown(text) {
 }
 function escapeHtml(t) { return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-// ── Render mermaid blocks from data-code attribute ─────────────
 async function renderMermaidBlocks(container) {
     const blocks = container.querySelectorAll(".mermaid-container");
     for (const block of blocks) {
@@ -859,7 +804,6 @@ async function renderMermaidBlocks(container) {
             const id = "mg-" + Math.random().toString(36).slice(2);
             const { svg } = await mermaid.render(id, code);
             block.innerHTML = svg;
-            // Fix SVG sizing
             const svgEl = block.querySelector("svg");
             if (svgEl) {
                 svgEl.style.maxWidth = "100%";
@@ -926,7 +870,7 @@ async function loadDocumentList() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// VOICE
+// VOICE (inline mic in the message box)
 // ══════════════════════════════════════════════════════════════
 function initVoice() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -953,7 +897,7 @@ function speak(text) {
         .replace(/#{1,3} /g,"")
         .replace(/\[WEATHER_CARD\][\s\S]*?\[\/WEATHER_CARD\]/g,"Weather shown.")
         .replace(/\[IMAGE\][\s\S]*?\[\/IMAGE\]/g,"Image generated.")
-        .replace(/!\[([^\]]*)\]\([^)]+\)/g,"")  // ← ADD: strip markdown images from TTS
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g,"")
         .replace(/\n+/g," ").trim();
     const u=new SpeechSynthesisUtterance(clean); u.lang="en-US";
     const v=window.speechSynthesis.getVoices().find(v=>v.name.includes("Google")||v.name.includes("Natural")); if(v) u.voice=v;
@@ -964,6 +908,167 @@ function speak(text) {
 function stopSpeaking() { if(window.speechSynthesis) window.speechSynthesis.cancel(); document.getElementById("tts-btn")?.classList.remove("speaking"); }
 function toggleTTS() { ttsEnabled=!ttsEnabled; document.getElementById("tts-btn")?.classList.toggle("muted",!ttsEnabled); if(!ttsEnabled) stopSpeaking(); }
 if(window.speechSynthesis) window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
+
+// ══════════════════════════════════════════════════════════════
+// CALL MODE (full-screen continuous voice conversation)
+// ══════════════════════════════════════════════════════════════
+let callActive      = false;
+let callRecognition = null;
+
+function startCallMode() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert("Voice recognition is not supported in this browser. Try Chrome."); return; }
+
+    callActive = true;
+    document.getElementById("call-screen").style.display = "flex";
+    document.getElementById("call-transcript").textContent = "";
+    stopSpeaking();
+
+    callListenOnce();
+}
+
+function endCallMode() {
+    callActive = false;
+    if (callRecognition) { try { callRecognition.stop(); } catch {} callRecognition = null; }
+    window.speechSynthesis?.cancel();
+    document.getElementById("call-screen").style.display = "none";
+}
+
+function setCallOrb(state) {
+    const orb = document.getElementById("call-orb");
+    if (!orb) return;
+    orb.classList.remove("listening", "thinking", "speaking");
+    orb.classList.add(state);
+}
+
+function setCallStatus(text) {
+    const el = document.getElementById("call-status");
+    if (el) el.textContent = text;
+}
+
+function callListenOnce() {
+    if (!callActive) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    callRecognition = new SR();
+    callRecognition.lang = "en-US";
+    callRecognition.continuous = false;
+    callRecognition.interimResults = true;
+
+    setCallOrb("listening");
+    setCallStatus("Listening…");
+
+    let finalText = "";
+
+    callRecognition.onresult = (e) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            const t = e.results[i][0].transcript;
+            e.results[i].isFinal ? (finalText += t) : (interim += t);
+        }
+        document.getElementById("call-transcript").textContent = finalText || interim;
+    };
+
+    callRecognition.onerror = () => {
+        if (!callActive) return;
+        setTimeout(() => { if (callActive) callListenOnce(); }, 800);
+    };
+
+    callRecognition.onend = async () => {
+        if (!callActive) return;
+        const text = finalText.trim();
+        if (!text) {
+            callListenOnce();
+            return;
+        }
+        await callSendAndReply(text);
+    };
+
+    try { callRecognition.start(); } catch {}
+}
+
+async function callSendAndReply(text) {
+    setCallOrb("thinking");
+    setCallStatus("Thinking…");
+    document.getElementById("call-transcript").textContent = text;
+
+    const sendTime = new Date().toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit"});
+    messages.push({role:"user", content:text, time:sendTime});
+    document.getElementById("welcome")?.remove();
+    appendBubble(text, "user", true, sendTime);
+
+    let fullReply = "";
+    try {
+        const safeMessages = messages.map(m => {
+            if (!m.content) return m;
+            if (m.content.includes("[IMAGE]") || m.content.includes("data:image") || m.content.includes("[Image was generated]")) {
+                return {...m, content: "[Image was generated]"};
+            }
+            if (m.content.length > 4000) return {...m, content: m.content.slice(0, 4000)};
+            return m;
+        });
+
+        const res = await fetch(`${API}/chat`, {
+            method: "POST", headers: authH(),
+            body: JSON.stringify({messages: safeMessages, session_id: currentSid, stream: true})
+        });
+
+        const reader  = res.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const lines = decoder.decode(value).split("\n");
+            for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try {
+                    const ev = JSON.parse(line.slice(6));
+                    if (ev.type === "token") fullReply += ev.text;
+                } catch {}
+            }
+        }
+    } catch {
+        fullReply = "Sorry, I could not reach the server.";
+    }
+
+    const safeReply = (fullReply.includes("[IMAGE]") || fullReply.includes("data:image"))
+        ? "[Image was generated]" : (fullReply || "Sorry, no response.");
+    messages.push({role:"assistant", content: safeReply});
+    appendBubble(fullReply || "Sorry, no response.", "bot", true);
+
+    const s = sessions.find(s => s.id === currentSid);
+    if (s && s.title === "New Chat") { s.title = text.length>45 ? text.slice(0,45)+"…" : text; renderHistory(); }
+
+    if (!callActive) return;
+    callSpeakReply(safeReply.includes("[Image was generated]") ? "I've generated an image, you can see it in the chat." : fullReply);
+}
+
+function callSpeakReply(text) {
+    if (!window.speechSynthesis) { if (callActive) callListenOnce(); return; }
+    setCallOrb("speaking");
+    setCallStatus("Speaking…");
+    document.getElementById("call-transcript").textContent = "";
+
+    const clean = text
+        .replace(/```[\s\S]*?```/g, "code block.")
+        .replace(/`[^`]+`/g, "")
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .replace(/\*(.+?)\*/g, "$1")
+        .replace(/#{1,3} /g, "")
+        .replace(/\[WEATHER_CARD\][\s\S]*?\[\/WEATHER_CARD\]/g, "Weather shown.")
+        .replace(/\[IMAGE\][\s\S]*?\[\/IMAGE\]/g, "")
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "")
+        .replace(/\n+/g, " ").trim();
+
+    const u = new SpeechSynthesisUtterance(clean || "Done.");
+    u.lang = "en-US";
+    const v = window.speechSynthesis.getVoices().find(v => v.name.includes("Google") || v.name.includes("Natural"));
+    if (v) u.voice = v;
+
+    u.onend = () => { if (callActive) callListenOnce(); };
+    u.onerror = () => { if (callActive) callListenOnce(); };
+
+    window.speechSynthesis.speak(u);
+}
 
 // ══════════════════════════════════════════════════════════════
 // UTILS
@@ -1009,7 +1114,6 @@ function closeSidebar() {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-overlay').classList.remove('show');
 }
-// toggleSidebar is patched inline below after openSidebar/closeSidebar defined
 
 // ══════════════════════════════════════════════════════════════
 // MESSAGE EDITING
@@ -1018,19 +1122,12 @@ function editMessage(msgIndex) {
     const userRows = document.querySelectorAll('.msg-row.user');
     const row      = userRows[msgIndex];
     if (!row) return;
-
-    // Read from data attribute — 100% accurate, never reads bot text
     const origText = row.querySelector('.user-bubble')?.dataset?.userText
                   || row.querySelector('.user-bubble')?.textContent?.trim()
                   || "";
-
-    // Find the inner wrap to replace
     const wrap = row.querySelector('.user-msg-wrap') || row.querySelector('.user-bubble-outer') || row.querySelector('.bubble');
     if (!wrap) return;
-
-    // Store for cancel
     wrap.dataset.origText = origText;
-
     wrap.innerHTML = "";
     const ta = document.createElement("textarea");
     ta.className = "edit-area";
@@ -1038,7 +1135,6 @@ function editMessage(msgIndex) {
     ta.rows = 3;
     ta.value = origText;
     wrap.appendChild(ta);
-
     const acts = document.createElement("div");
     acts.className = "edit-actions";
     acts.innerHTML = `
@@ -1048,12 +1144,10 @@ function editMessage(msgIndex) {
         </button>
         <button class="edit-cancel-btn" onclick="cancelEdit(${msgIndex})">Cancel</button>`;
     wrap.appendChild(acts);
-
     ta.focus();
     ta.style.height = "auto";
     ta.style.height = ta.scrollHeight + "px";
 }
-
 function cancelEdit(msgIndex) {
     const userRows = document.querySelectorAll('.msg-row.user');
     const row      = userRows[msgIndex];
@@ -1061,25 +1155,21 @@ function cancelEdit(msgIndex) {
     const wrap     = row.querySelector('.user-msg-wrap') || row.querySelector('.user-bubble-outer') || row.querySelector('.bubble');
     if (!wrap) return;
     const origText = wrap.dataset.origText || messages[msgIndex * 2]?.content || "";
-
     wrap.innerHTML = "";
     const msgDiv  = document.createElement("div");
     msgDiv.className = "user-bubble";
     msgDiv.textContent = origText;
-    msgDiv.dataset.userText = origText;  // restore data attribute
+    msgDiv.dataset.userText = origText;
     wrap.appendChild(msgDiv);
-
     const timeStr = messages[msgIndex * 2]?.time || "";
     const actBar  = document.createElement("div");
     actBar.className = "user-action-bar";
     actBar.innerHTML = `<span class="msg-time">${timeStr}</span>`;
-
     const eb = document.createElement("button");
     eb.className = "ua-btn"; eb.title = "Edit message";
     eb.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit`;
     eb.onclick = () => editMessage(msgIndex);
     actBar.appendChild(eb);
-
     const cb = document.createElement("button");
     cb.className = "ua-btn"; cb.title = "Copy";
     cb.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`;
@@ -1087,14 +1177,11 @@ function cancelEdit(msgIndex) {
     actBar.appendChild(cb);
     wrap.appendChild(actBar);
 }
-
 async function saveEdit(msgIndex) {
     const ta = document.getElementById(`edit-area-${msgIndex}`);
     if (!ta) return;
     const newText = ta.value.trim();
     if (!newText) return;
-
-    // Remove all messages from this point onward in the DOM
     const allRows = Array.from(document.querySelectorAll('.msg-row'));
     const userRows = document.querySelectorAll('.msg-row.user');
     const editedRow = userRows[msgIndex];
@@ -1103,12 +1190,8 @@ async function saveEdit(msgIndex) {
         if (row === editedRow) removing = true;
         if (removing) row.remove();
     });
-
-    // Trim messages array to before this edit
     const msgArrayIndex = msgIndex * 2;
     messages = messages.slice(0, msgArrayIndex);
-
-    // Re-send with new text
     const input = document.getElementById('user-input');
     input.value = newText;
     await sendMessage();
@@ -1144,7 +1227,7 @@ function _addEditButton() {
     const userRows = document.querySelectorAll('.msg-row.user');
     const lastRow  = userRows[userRows.length - 1];
     if (!lastRow) return;
-    if (lastRow.querySelector('.edit-btn')) return; // already added
+    if (lastRow.querySelector('.edit-btn')) return;
     const idx = userRows.length - 1;
     const bar = lastRow.querySelector('.feedback-bar');
     if (bar) {
