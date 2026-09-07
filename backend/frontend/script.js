@@ -1,5 +1,5 @@
 const API = "https://khizer-nexusbot.up.railway.app/api";
-const GCID = "638940044835-59hp6jsabcr9krl8hgennni7ma4tqooh.apps.googleusercontent.com";  // ← Paste your Client ID from Google Cloud Console
+const GCID = "638940044835-r945jm44cf3mhmdmi36f6uroc2nqmnse.apps.googleusercontent.com";  // ← Paste your Client ID from Google Cloud Console
 
 
 const BOT_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22">
