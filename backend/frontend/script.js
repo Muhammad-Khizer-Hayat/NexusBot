@@ -1,6 +1,5 @@
-const API = "https://khizer-nexusbot.up.railway.app/api";
-const GCID = "638940044835-r945jm44cf3mhmdmi36f6uroc2nqmnse.apps.googleusercontent.com";  // ← Paste your Client ID from Google Cloud Console
-
+const API  = "/api";   // same address as the page: works locally and on any host
+const GCID = "638940044835-r945jm44cf3mhmdmi36f6uroc2nqmnse.apps.googleusercontent.com";   // ← paste your FULL Google Client ID here (ends in .apps.googleusercontent.com)
 
 const BOT_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22">
   <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="#6c63ff"/>
@@ -55,8 +54,8 @@ async function doLogin() {
         const r = await fetch(`${API}/auth/login`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username, password})});
         const d = await r.json();
         if (d.token) { saveAuth(d.token, d.user); initApp(); }
-        else showAuthError(d.error || "Login failed");
-    } catch { showAuthError("Cannot connect to server. Make sure backend is running on port 8000."); }
+        else showAuthError(d.error || d.detail || "Login failed");
+    } catch { showAuthError("Cannot connect to server. Make sure the backend is running."); }
     btn.textContent = "Sign In"; btn.disabled = false;
 }
 async function doRegister() {
@@ -70,7 +69,7 @@ async function doRegister() {
         const r = await fetch(`${API}/auth/register`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username, email, password})});
         const d = await r.json();
         if (d.token) { saveAuth(d.token, d.user); initApp(); }
-        else showAuthError(d.error || "Registration failed");
+        else showAuthError(d.error || d.detail || "Registration failed");
     } catch { showAuthError("Cannot connect to server."); }
     btn.textContent = "Create Account"; btn.disabled = false;
 }
@@ -102,9 +101,9 @@ function googleSignIn() {
                 });
                 const d = await r.json();
                 if (d.token) { saveAuth(d.token, d.user); initApp(); }
-                else showAuthError(d.error || "Google login failed");
+                else showAuthError(d.error || d.detail || "Google login failed");
             } catch(e) {
-                showAuthError("Could not reach server. Make sure backend is running.");
+                showAuthError("Could not reach server: " + (e && e.message ? e.message : e));
             }
         },
         ux_mode: "popup",
@@ -164,6 +163,7 @@ async function initApp() {
     const av = document.getElementById("user-avatar");
     if (u.avatar) { av.innerHTML = `<img src="${u.avatar}" alt="${u.username}"/>`; }
     else { av.textContent = u.username.charAt(0).toUpperCase(); }
+    updateActionBtn();
     initVoice();
     updateDatetime();
     setInterval(updateDatetime, 60000);
@@ -248,7 +248,7 @@ async function handleImageUpload(file) {
         }
     } catch {
         removeTyping(typingId);
-        appendBubble("⚠️ Image upload failed. Make sure Flask is running.", "bot", true);
+        appendBubble("⚠️ Image upload failed. Make sure the backend is running.", "bot", true);
     }
     document.getElementById("input-file-image").value = "";
 }
@@ -328,7 +328,7 @@ function showWelcome() {
         <div class="suggestion" onclick="suggest(this)"><div class="sug-icon">💻</div><div class="sug-text">Write a Python web scraper using BeautifulSoup</div></div>
         <div class="suggestion" onclick="suggest(this)"><div class="sug-icon">🧮</div><div class="sug-text">What is 18% of 75000?</div></div>
         <div class="suggestion" onclick="suggest(this)"><div class="sug-icon">🎨</div><div class="sug-text">Generate image of sunset over mountains</div></div>
-        <div class="suggestion" onclick="suggest(this)"><div class="sug-icon">🎤</div><div class="sug-text">Click mic and speak your question!</div></div>
+        <div class="suggestion" onclick="suggest(this)"><div class="sug-icon">🎤</div><div class="sug-text">Tap the waveform button and talk to me!</div></div>
       </div>
     </div>`;
 }
@@ -351,6 +351,7 @@ async function sendMessage() {
     messages.push({role:"user", content:text, time:sendTime, timeFull:sendFull});
     appendBubble(text, "user", true, sendTime, sendFull);
     input.value = ""; input.style.height = "auto";
+    updateActionBtn();
     isTyping = true; btn.disabled = true;
     const tid = showTyping();
     try {
@@ -377,11 +378,14 @@ async function sendMessage() {
         let   fullReply = "";
         let   meta      = {};
         let   bubbleEl  = null;
+        let   sseBuf    = "";
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const lines = decoder.decode(value).split("\n");
+            sseBuf += decoder.decode(value, { stream: true });
+            const lines = sseBuf.split("\n");
+            sseBuf = lines.pop();                        // keep the unfinished last line for the next chunk
             for (const line of lines) {
                 if (!line.startsWith("data: ")) continue;
                 try {
@@ -417,7 +421,7 @@ async function sendMessage() {
         if (s && s.title === "New Chat") { s.title = text.length>45 ? text.slice(0,45)+"…" : text; renderHistory(); }
     } catch {
         removeTyping(tid);
-        appendBubble("⚠️ Could not reach the server. Make sure the backend is running on port 8000.", "bot", true);
+        appendBubble("⚠️ Could not reach the server. Make sure the backend is running.", "bot", true);
     } finally { isTyping = false; btn.disabled = false; input.focus(); }
 }
 
@@ -607,6 +611,7 @@ function buildImageCard(imageUrl) {
         if (lastUser) {
             document.getElementById("user-input").value = lastUser.content;
             document.getElementById("user-input").focus();
+            updateActionBtn();
         }
     };
     window[`shareImage_${cardId}`] = function() {
@@ -870,7 +875,7 @@ async function loadDocumentList() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// VOICE (inline mic in the message box)
+// VOICE (dictation into the message box + read-aloud for chat)
 // ══════════════════════════════════════════════════════════════
 function initVoice() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -885,7 +890,7 @@ function initVoice() {
     recognition.onend = () => { isListening=false; setMicState(false); const t=document.getElementById("user-input").value.trim(); if(t) sendMessage(); };
     recognition.onerror = () => { isListening=false; setMicState(false); };
 }
-function toggleMic() { if(!recognition) return; isListening?recognition.stop():(()=>{document.getElementById("user-input").value="";recognition.start();})(); }
+function toggleMic() { if(!recognition) return; isListening?recognition.stop():(()=>{document.getElementById("user-input").value="";updateActionBtn();recognition.start();})(); }
 function setMicState(a) { document.getElementById("mic-btn")?.classList.toggle("listening",a); document.getElementById("mic-ring")?.classList.toggle("active",a); }
 function speak(text) {
     if(!ttsEnabled||!window.speechSynthesis) return; stopSpeaking();
@@ -910,171 +915,553 @@ function toggleTTS() { ttsEnabled=!ttsEnabled; document.getElementById("tts-btn"
 if(window.speechSynthesis) window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
 
 // ══════════════════════════════════════════════════════════════
-// CALL MODE (full-screen continuous voice conversation)
+// CALL MODE — full-screen voice conversation (like ChatGPT voice)
+// ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// CALL MODE — full-screen voice conversation (like ChatGPT voice)
+// Natural neural voice from the backend (/api/tts); falls back to the browser voice.
 // ══════════════════════════════════════════════════════════════
 let callActive      = false;
+let callMuted       = false;
 let callRecognition = null;
+let callState       = "idle";            // listening | thinking | speaking | muted
+let callLang        = localStorage.getItem("nb_call_lang")   || "en-US";
+let callGender      = localStorage.getItem("nb_call_gender") || "female";
+let callAbort       = null;              // AbortController of the running chat request
+let callSpeakQueue  = 0;                 // sentences waiting to be / being spoken
+let callStreamDone  = true;              // true when the reply has fully arrived
+let callRunId       = 0;                 // changes every turn; stale callbacks check it
 
+// natural-voice playback
+let callAudio         = null;            // ONE <audio> element reused for every sentence (also works on iPhone)
+let callAudioResolve  = null;
+let callBrowserResolve = null;
+let callTtsQueue      = [];              // [{text, lang, runId, promise}]
+let callTtsBusy       = false;
+let callTtsCtrl       = null;            // aborts pending /api/tts requests
+let callTtsFails      = 0;
+let callTtsDown       = false;           // after 2 failures in a row → use the browser voice
+
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+const CALL_NON_LATIN = new Set(["ur-PK","ar-SA","fa-IR","hi-IN","bn-BD","zh-CN","ja-JP","ko-KR","ru-RU"]);
+
+const CALL_TEXT = {
+    "en": { note: "I've put it in the chat.",            err: "Sorry, I couldn't reach the server." },
+    "ur": { note: "میں نے یہ چیٹ میں دکھا دیا ہے۔",        err: "معذرت، سرور سے رابطہ نہیں ہو سکا۔" },
+    "ar": { note: "لقد عرضته في المحادثة.",                err: "عذراً، تعذر الاتصال بالخادم." },
+    "hi": { note: "मैंने इसे चैट में दिखा दिया है।",          err: "माफ़ कीजिए, सर्वर से संपर्क नहीं हो सका।" },
+    "es": { note: "Lo he mostrado en el chat.",            err: "Lo siento, no pude conectar con el servidor." },
+    "fr": { note: "Je l'ai affiché dans le chat.",         err: "Désolé, je n'ai pas pu joindre le serveur." },
+    "tr": { note: "Bunu sohbette gösterdim.",              err: "Üzgünüm, sunucuya ulaşılamadı." },
+    "de": { note: "Ich habe es im Chat angezeigt.",        err: "Entschuldigung, der Server ist nicht erreichbar." }
+};
+function callText(kind) {
+    const t = CALL_TEXT[callLang.split("-")[0]] || CALL_TEXT["en"];
+    return t[kind];
+}
+
+// ── Start / end ────────────────────────────────────────────────
 function startCallMode() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert("Voice recognition is not supported in this browser. Try Chrome."); return; }
-
-    callActive = true;
-    document.getElementById("call-screen").style.display = "flex";
-    document.getElementById("call-transcript").textContent = "";
+    if (!SR) {
+        alert("Voice conversation needs Chrome or Edge. This browser does not support speech recognition.");
+        return;
+    }
     stopSpeaking();
-
+    callActive = true;
+    callMuted  = false;
+    callTtsFails = 0;
+    callTtsDown  = false;
+    unlockCallAudio();                       // must happen inside the tap so the browser allows sound later
+    const sel = document.getElementById("call-lang-select");
+    if (sel) sel.value = callLang;
+    const gsel = document.getElementById("call-gender-select");
+    if (gsel) gsel.value = callGender;
+    updateMuteBtn();
+    document.getElementById("call-transcript").textContent = "";
+    document.getElementById("call-screen").style.display = "flex";
+    document.getElementById("welcome")?.remove();
     callListenOnce();
 }
 
 function endCallMode() {
     callActive = false;
-    if (callRecognition) { try { callRecognition.stop(); } catch {} callRecognition = null; }
-    window.speechSynthesis?.cancel();
+    callRunId++;
+    stopCallRecognition();
+    if (callAbort) { try { callAbort.abort(); } catch {} callAbort = null; }
+    resetCallAudio();
     document.getElementById("call-screen").style.display = "none";
 }
 
-function setCallOrb(state) {
-    const orb = document.getElementById("call-orb");
-    if (!orb) return;
-    orb.classList.remove("listening", "thinking", "speaking");
-    orb.classList.add(state);
+function setCallLanguage(lang) {
+    callLang = lang;
+    localStorage.setItem("nb_call_lang", lang);
+    if (callActive && callState === "listening") callListenOnce();   // restart in the new language
 }
 
-function setCallStatus(text) {
-    const el = document.getElementById("call-status");
-    if (el) el.textContent = text;
+function setCallGender(g) {
+    callGender = (g === "male") ? "male" : "female";
+    localStorage.setItem("nb_call_gender", callGender);
+}
+
+// ── UI state ───────────────────────────────────────────────────
+function setCallState(state, text) {
+    callState = state;
+    const orb = document.getElementById("call-orb");
+    if (orb) {
+        orb.classList.remove("listening", "thinking", "speaking", "muted");
+        orb.classList.add(state);
+    }
+    const labels = {
+        listening: "Listening…",
+        thinking:  "Thinking…",
+        speaking:  "Speaking… tap the orb to interrupt",
+        muted:     "Microphone is muted"
+    };
+    const st = document.getElementById("call-status");
+    if (st) st.textContent = text || labels[state] || "";
+}
+
+function updateMuteBtn() {
+    document.getElementById("call-mute-btn")?.classList.toggle("off", callMuted);
+}
+
+function toggleCallMute() {
+    callMuted = !callMuted;
+    updateMuteBtn();
+    if (callMuted) {
+        stopCallRecognition();
+        if (callState === "listening") setCallState("muted");
+    } else if (callState === "muted") {
+        callListenOnce();
+    }
+}
+
+// Tap the orb while the bot is thinking or speaking → stop it and listen again
+function callOrbTap() {
+    if (!callActive) return;
+    if (callState === "speaking" || callState === "thinking") {
+        callRunId++;
+        if (callAbort) { try { callAbort.abort(); } catch {} callAbort = null; }
+        resetCallAudio();
+        callStreamDone = true;
+        callListenOnce();
+    }
+}
+
+// ── Listening ──────────────────────────────────────────────────
+function stopCallRecognition() {
+    if (!callRecognition) return;
+    callRecognition.onresult = null;
+    callRecognition.onerror  = null;
+    callRecognition.onend    = null;
+    try { callRecognition.abort(); } catch {}
+    callRecognition = null;
 }
 
 function callListenOnce() {
     if (!callActive) return;
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    callRecognition = new SR();
-    callRecognition.lang = "en-US";
-    callRecognition.continuous = false;
-    callRecognition.interimResults = true;
+    stopCallRecognition();
+    if (callMuted) { setCallState("muted"); return; }
 
-    setCallOrb("listening");
-    setCallStatus("Listening…");
+    const SR  = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    callRecognition = rec;
+    rec.lang            = callLang;
+    rec.continuous      = false;
+    rec.interimResults  = true;
+    rec.maxAlternatives = 1;
 
-    let finalText = "";
+    setCallState("listening");
+    document.getElementById("call-transcript").textContent = "";
 
-    callRecognition.onresult = (e) => {
+    let finalText = "", lastInterim = "", errCode = "";
+
+    rec.onresult = (e) => {
         let interim = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
             const t = e.results[i][0].transcript;
-            e.results[i].isFinal ? (finalText += t) : (interim += t);
+            if (e.results[i].isFinal) finalText += t; else interim += t;
         }
-        document.getElementById("call-transcript").textContent = finalText || interim;
+        lastInterim = interim;
+        document.getElementById("call-transcript").textContent = (finalText + " " + interim).trim();
     };
 
-    callRecognition.onerror = () => {
-        if (!callActive) return;
-        setTimeout(() => { if (callActive) callListenOnce(); }, 800);
-    };
+    rec.onerror = (e) => { errCode = (e && e.error) || "error"; };
 
-    callRecognition.onend = async () => {
-        if (!callActive) return;
-        const text = finalText.trim();
-        if (!text) {
-            callListenOnce();
+    rec.onend = () => {
+        if (!callActive || callRecognition !== rec) return;
+        callRecognition = null;
+
+        if (errCode === "not-allowed" || errCode === "service-not-allowed") {
+            setCallState("listening", "Microphone is blocked. Allow microphone access for this site, then start the call again.");
             return;
         }
-        await callSendAndReply(text);
+        if (errCode === "language-not-supported") {
+            setCallState("listening", "This browser cannot recognise the selected language. Pick another language or use Chrome.");
+            return;
+        }
+
+        const text = (finalText.trim() || lastInterim.trim());
+        if (text) { callSendAndReply(text); return; }
+
+        // nothing heard → listen again (slower retry if there was a real error)
+        const delay = (!errCode || errCode === "no-speech") ? 150 : 1500;
+        setTimeout(() => { if (callActive && !callMuted && callState === "listening") callListenOnce(); }, delay);
     };
 
-    try { callRecognition.start(); } catch {}
+    try { rec.start(); }
+    catch { setTimeout(() => { if (callActive) callListenOnce(); }, 500); }
 }
 
+// ── Sending + speaking sentence by sentence ────────────────────
 async function callSendAndReply(text) {
-    setCallOrb("thinking");
-    setCallStatus("Thinking…");
+    const myRun = ++callRunId;
+    resetCallAudio();
+    callTtsCtrl    = new AbortController();
+    callStreamDone = false;
+    setCallState("thinking");
     document.getElementById("call-transcript").textContent = text;
 
     const sendTime = new Date().toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit"});
     messages.push({role:"user", content:text, time:sendTime});
-    document.getElementById("welcome")?.remove();
     appendBubble(text, "user", true, sendTime);
 
-    let fullReply = "";
-    try {
-        const safeMessages = messages.map(m => {
-            if (!m.content) return m;
-            if (m.content.includes("[IMAGE]") || m.content.includes("data:image") || m.content.includes("[Image was generated]")) {
-                return {...m, content: "[Image was generated]"};
-            }
-            if (m.content.length > 4000) return {...m, content: m.content.slice(0, 4000)};
-            return m;
-        });
+    const safeMessages = messages.map(m => {
+        if (!m.content) return m;
+        if (m.content.includes("[IMAGE]") || m.content.includes("data:image") || m.content.includes("[Image was generated]")) {
+            return {...m, content: "[Image was generated]"};
+        }
+        if (m.content.length > 4000) return {...m, content: m.content.slice(0, 4000)};
+        return m;
+    });
 
+    const ctrl = new AbortController();
+    callAbort = ctrl;
+
+    let fullReply = "", sentenceBuf = "", speakBuf = "";
+    let codeNoted = false, failed = false, inCodeBlock = false, spokeFirst = false;
+
+    // the first chunk is short (fast start); later chunks are longer (smoother voice)
+    const speakPart = (s) => {
+        speakBuf += (speakBuf ? " " : "") + s;
+        if (speakBuf.length >= (spokeFirst ? 45 : 20)) {
+            enqueueSpeech(speakBuf, myRun);
+            speakBuf = ""; spokeFirst = true;
+        }
+    };
+
+    try {
         const res = await fetch(`${API}/chat`, {
-            method: "POST", headers: authH(),
+            method: "POST", headers: authH(), signal: ctrl.signal,
             body: JSON.stringify({messages: safeMessages, session_id: currentSid, stream: true})
         });
+        if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
 
         const reader  = res.body.getReader();
         const decoder = new TextDecoder();
+        let buf = "";
+
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const lines = decoder.decode(value).split("\n");
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop();                           // keep the unfinished last line
             for (const line of lines) {
                 if (!line.startsWith("data: ")) continue;
-                try {
-                    const ev = JSON.parse(line.slice(6));
-                    if (ev.type === "token") fullReply += ev.text;
-                } catch {}
+                let ev; try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+                if (ev.type !== "token" || !ev.text) continue;
+
+                fullReply += ev.text;
+                if (fullReply.includes("[IMAGE]") || fullReply.includes("[WEATHER_CARD]")) continue;
+
+                // walk through the token, switching in/out of code blocks at every ```
+                const segs = ev.text.split("```");
+                for (let i = 0; i < segs.length; i++) {
+                    if (i > 0) {
+                        inCodeBlock = !inCodeBlock;
+                        if (inCodeBlock) {               // a code block just started: never read code aloud
+                            if (sentenceBuf.trim()) speakPart(sentenceBuf.trim());
+                            sentenceBuf = "";
+                            if (!codeNoted) { codeNoted = true; speakPart(callText("note")); }
+                        }
+                    }
+                    if (!inCodeBlock) sentenceBuf += segs[i];
+                }
+                const parts = splitSentences(sentenceBuf);
+                sentenceBuf = parts.rest;
+                parts.sentences.forEach(speakPart);
             }
         }
-    } catch {
-        fullReply = "Sorry, I could not reach the server.";
+    } catch (e) {
+        if (!e || e.name !== "AbortError") failed = true;
     }
 
-    const safeReply = (fullReply.includes("[IMAGE]") || fullReply.includes("data:image"))
-        ? "[Image was generated]" : (fullReply || "Sorry, no response.");
-    messages.push({role:"assistant", content: safeReply});
-    appendBubble(fullReply || "Sorry, no response.", "bot", true);
+    if (callAbort === ctrl) callAbort = null;
+    const stale   = (myRun !== callRunId);
+    const special = fullReply.includes("[IMAGE]") || fullReply.includes("[WEATHER_CARD]");
 
+    if (!stale && callActive) {
+        if (special)             enqueueSpeech(callText("note"), myRun);
+        else {
+            const tail = (speakBuf + " " + sentenceBuf).trim();
+            if (tail)            enqueueSpeech(tail, myRun);
+        }
+        if (failed && !fullReply) enqueueSpeech(callText("err"), myRun);
+    }
+
+    // keep the conversation in the chat (even a partial reply if the user interrupted)
+    const reply = fullReply.trim();
+    if (reply) {
+        const stored = (reply.includes("[IMAGE]") || reply.includes("data:image")) ? "[Image was generated]" : reply;
+        messages.push({role:"assistant", content: stored});
+        appendBubble(reply, "bot", true);
+    } else if (failed) {
+        appendBubble("⚠️ Could not reach the server. Please try again.", "bot", true);
+    }
     const s = sessions.find(s => s.id === currentSid);
-    if (s && s.title === "New Chat") { s.title = text.length>45 ? text.slice(0,45)+"…" : text; renderHistory(); }
+    if (s && s.title === "New Chat") { s.title = text.length > 45 ? text.slice(0, 45) + "…" : text; renderHistory(); }
 
-    if (!callActive) return;
-    callSpeakReply(safeReply.includes("[Image was generated]") ? "I've generated an image, you can see it in the chat." : fullReply);
+    if (stale || !callActive) return;
+    callStreamDone = true;
+    callMaybeResume(myRun);
 }
 
-function callSpeakReply(text) {
-    if (!window.speechSynthesis) { if (callActive) callListenOnce(); return; }
-    setCallOrb("speaking");
-    setCallStatus("Speaking…");
-    document.getElementById("call-transcript").textContent = "";
-
-    const clean = text
-        .replace(/```[\s\S]*?```/g, "code block.")
-        .replace(/`[^`]+`/g, "")
-        .replace(/\*\*(.+?)\*\*/g, "$1")
-        .replace(/\*(.+?)\*/g, "$1")
-        .replace(/#{1,3} /g, "")
-        .replace(/\[WEATHER_CARD\][\s\S]*?\[\/WEATHER_CARD\]/g, "Weather shown.")
-        .replace(/\[IMAGE\][\s\S]*?\[\/IMAGE\]/g, "")
-        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "")
-        .replace(/\n+/g, " ").trim();
-
-    const u = new SpeechSynthesisUtterance(clean || "Done.");
-    u.lang = "en-US";
-    const v = window.speechSynthesis.getVoices().find(v => v.name.includes("Google") || v.name.includes("Natural"));
-    if (v) u.voice = v;
-
-    u.onend = () => { if (callActive) callListenOnce(); };
-    u.onerror = () => { if (callActive) callListenOnce(); };
-
-    window.speechSynthesis.speak(u);
+function callMaybeResume(runId) {
+    if (!callActive || runId !== callRunId) return;
+    if (callState === "listening" && callRecognition) return;       // already listening
+    if (callStreamDone && callSpeakQueue === 0) callListenOnce();
 }
 
+// ── Natural voice playback ─────────────────────────────────────
+function unlockCallAudio() {
+    if (!callAudio) callAudio = new Audio();
+    try {
+        callAudio.src = SILENT_WAV;
+        const p = callAudio.play();
+        if (p && p.catch) p.catch(() => {});
+    } catch {}
+}
+
+function resetCallAudio() {
+    callTtsQueue = [];
+    if (callTtsCtrl) { try { callTtsCtrl.abort(); } catch {} callTtsCtrl = null; }
+    stopCallAudio();
+    callSpeakQueue = 0;
+}
+
+function stopCallAudio() {
+    if (callAudio) { try { callAudio.pause(); } catch {} }
+    if (callAudioResolve)   callAudioResolve(true);
+    if (callBrowserResolve) callBrowserResolve();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+async function ttsFetch(text, lang, signal) {
+    const res = await fetch(`${API}/tts`, {
+        method: "POST", signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, lang, gender: callGender })
+    });
+    if (!res.ok) throw new Error("tts " + res.status);
+    const blob = await res.blob();
+    if (!blob || !blob.size) throw new Error("empty audio");
+    return URL.createObjectURL(blob);
+}
+
+// Queue one chunk of text. The audio is requested right away, so the next chunk is ready while this one plays.
+function enqueueSpeech(raw, runId) {
+    if (!callActive || runId !== callRunId) return;
+    const clean = cleanForSpeech(raw);
+    if (!clean) return;
+
+    const lang = detectSpeechLang(clean);
+    const item = { text: clean, lang, runId, promise: null };
+    if (!callTtsDown) {
+        item.promise = ttsFetch(clean, lang, callTtsCtrl ? callTtsCtrl.signal : undefined)
+            .then(url => { callTtsFails = 0; return url; })
+            .catch(err => {
+                if (!err || err.name !== "AbortError") { callTtsFails++; if (callTtsFails >= 2) callTtsDown = true; }
+                return null;
+            });
+    }
+    callSpeakQueue++;
+    callTtsQueue.push(item);
+    if (!callTtsBusy) playNextTts();
+}
+
+async function playNextTts() {
+    if (callTtsBusy) return;
+    callTtsBusy = true;
+    while (callTtsQueue.length) {
+        const item = callTtsQueue.shift();
+        if (!callActive || item.runId !== callRunId) continue;                 // belongs to an interrupted turn
+
+        const url = item.promise ? await item.promise : null;
+        if (!callActive || item.runId !== callRunId) { if (url) URL.revokeObjectURL(url); continue; }
+
+        let played = false;
+        if (url) played = await playUrl(url, item);
+        if (!played && callActive && item.runId === callRunId) await speakWithBrowser(item);   // fallback voice
+
+        if (item.runId === callRunId) callSpeakQueue = Math.max(0, callSpeakQueue - 1);
+    }
+    callTtsBusy = false;
+    callMaybeResume(callRunId);
+}
+
+// resolves true when the audio played (or was stopped), false if the browser refused to play it
+function playUrl(url, item) {
+    return new Promise((resolve) => {
+        if (!callAudio) callAudio = new Audio();
+        const a = callAudio;
+        let done = false, guard = null;
+        const finish = (ok) => {
+            if (done) return; done = true;
+            clearTimeout(guard);
+            a.onplay = a.onended = a.onerror = null;
+            if (callAudioResolve === finish) callAudioResolve = null;
+            URL.revokeObjectURL(url);
+            resolve(ok);
+        };
+        callAudioResolve = finish;
+        guard = setTimeout(() => finish(true), 60000);
+        a.onplay  = () => {
+            if (item.runId !== callRunId) return;
+            setCallState("speaking");
+            document.getElementById("call-transcript").textContent = item.text;
+        };
+        a.onended = () => finish(true);
+        a.onerror = () => finish(false);
+        a.src = url;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => finish(false));
+    });
+}
+
+// fallback: the browser's own voice
+function speakWithBrowser(item) {
+    return new Promise((resolve) => {
+        if (!window.speechSynthesis) { resolve(); return; }
+        const u = new SpeechSynthesisUtterance(item.text);
+        u.lang = item.lang;
+        const v = pickVoice(item.lang);
+        if (v) u.voice = v;
+        let done = false, guard = null;
+        const finish = () => {
+            if (done) return; done = true;
+            clearTimeout(guard);
+            if (callBrowserResolve === finish) callBrowserResolve = null;
+            resolve();
+        };
+        callBrowserResolve = finish;
+        guard = setTimeout(finish, 30000);
+        u.onstart = () => {
+            if (item.runId !== callRunId) return;
+            setCallState("speaking");
+            document.getElementById("call-transcript").textContent = item.text;
+        };
+        u.onend = finish;
+        u.onerror = finish;
+        window.speechSynthesis.speak(u);
+    });
+}
+
+// ── Text → speech helpers ──────────────────────────────────────
+// Splits streamed text into finished sentences. Works for . ! ? ۔ ؟ । and 。！？
+function splitSentences(buf) {
+    const re = /[^.!?۔؟।\n]*[.!?۔؟।]+(?=\s)|[^。！？\n]*[。！？]+|[^\n]*\n/g;
+    const sentences = [];
+    let m, last = 0;
+    while ((m = re.exec(buf)) !== null) {
+        if (m[0] === "") { re.lastIndex++; continue; }
+        const s = m[0].trim();
+        if (s) sentences.push(s);
+        last = re.lastIndex;
+    }
+    return { sentences, rest: buf.slice(last) };
+}
+
+function cleanForSpeech(t) {
+    return t
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/`([^`]*)`/g, "$1")
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+        .replace(/https?:\/\/\S+/g, " ")
+        .replace(/\[\/?(WEATHER_CARD|IMAGE)\]/g, " ")
+        .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+        .replace(/^\s*[-*•]\s+/gm, "")
+        .replace(/^\s*\d+[.)]\s+/gm, "")
+        .replace(/[*_~>|]+/g, " ")
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+// Pick the speaking language from the script of the reply, so the right voice is used
+function detectSpeechLang(t) {
+    if (/[\u0600-\u06FF]/.test(t)) {
+        if (/[\u0679\u0688\u0691\u06BA\u06D2\u06BE\u06C1]/.test(t)) return "ur-PK";
+        return ["ar-SA", "fa-IR", "ur-PK"].includes(callLang) ? callLang : "ar-SA";
+    }
+    if (/[\u0900-\u097F]/.test(t)) return "hi-IN";
+    if (/[\u0980-\u09FF]/.test(t)) return "bn-BD";
+    if (/[\u3040-\u30FF]/.test(t)) return "ja-JP";
+    if (/[\uAC00-\uD7AF]/.test(t)) return "ko-KR";
+    if (/[\u4E00-\u9FFF]/.test(t)) return "zh-CN";
+    if (/[\u0400-\u04FF]/.test(t)) return "ru-RU";
+    return CALL_NON_LATIN.has(callLang) ? "en-US" : callLang;   // Latin text
+}
+
+// browser-voice picker (only used by the fallback)
+function pickVoice(lang) {
+    if (!window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || !voices.length) return null;
+    const want  = lang.toLowerCase();
+    const exact = voices.filter(v => (v.lang || "").replace("_", "-").toLowerCase() === want);
+    const base  = voices.filter(v => (v.lang || "").toLowerCase().startsWith(want.split("-")[0]));
+    const pool  = exact.length ? exact : base;
+    if (!pool.length) return null;
+    return pool.find(v => /natural|online/i.test(v.name))
+        || pool.find(v => /google/i.test(v.name))
+        || pool[0];
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && callActive) endCallMode();
+});
 // ══════════════════════════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════════════════════════
 function handleKey(e) { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();} }
-function autoResize(el) { el.style.height="auto"; el.style.height=Math.min(el.scrollHeight,180)+"px"; }
+
+function autoResize(el) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 180) + "px";
+    updateActionBtn();
+}
+
+// ChatGPT-style button: waveform when the box is empty, send arrow when there is text
+function updateActionBtn() {
+    const input = document.getElementById("user-input");
+    const btn   = document.getElementById("send-btn");
+    if (!input || !btn) return;
+    const has = input.value.trim().length > 0;
+    btn.classList.toggle("is-wave", !has);
+    btn.title = has ? "Send message" : "Start voice conversation";
+    const w = document.getElementById("icon-wave");
+    const s = document.getElementById("icon-send");
+    if (w) w.style.display = has ? "none"  : "block";
+    if (s) s.style.display = has ? "block" : "none";
+}
+function handleActionBtn() {
+    const has = document.getElementById("user-input").value.trim().length > 0;
+    has ? sendMessage() : startCallMode();
+}
+
 function toggleSidebar() {
     const isMobile = window.innerWidth <= 768;
     const sidebar  = document.getElementById("sidebar");
@@ -1086,6 +1473,7 @@ function toggleSidebar() {
         sidebar.classList.toggle("hidden");
     }
 }
+
 // ══════════════════════════════════════════════════════════════
 // DARK / LIGHT MODE TOGGLE
 // ══════════════════════════════════════════════════════════════

@@ -11,9 +11,12 @@ from fastapi.responses import FileResponse
 from auth.database import init_db
 from routes.chat import router as chat_router
 from routes.auth import router as auth_router
+from routes.tts import router as tts_router
 
 app_dir      = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(app_dir, "frontend")
+# On Vercel the project folder is read-only; only /tmp is writable
+data_dir     = "/tmp" if os.environ.get("VERCEL") else app_dir
 
 def create_app() -> FastAPI:
     app = FastAPI(title="NexusBot", version="2.0.0")
@@ -30,6 +33,7 @@ def create_app() -> FastAPI:
 
     app.include_router(chat_router, prefix="/api")
     app.include_router(auth_router, prefix="/api/auth")
+    app.include_router(tts_router,  prefix="/api")
 
     # Serve frontend static assets (css, js, images)
     assets_dir = os.path.join(frontend_dir, "assets")
@@ -37,9 +41,9 @@ def create_app() -> FastAPI:
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
     # Serve generated images as static files
-    gen_images_dir = os.path.join(app_dir, "static", "images")
+    gen_images_dir = os.path.join(data_dir, "static", "images")
     os.makedirs(gen_images_dir, exist_ok=True)
-    app.mount("/static", StaticFiles(directory=os.path.join(app_dir, "static")), name="static")
+    app.mount("/static", StaticFiles(directory=os.path.join(data_dir, "static")), name="static")
 
     # Serve individual frontend files
     @app.get("/style.css")

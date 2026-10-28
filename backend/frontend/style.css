@@ -218,10 +218,13 @@ textarea::placeholder{color:var(--tx3)}
 .mic-btn:hover{border-color:var(--ac2);color:var(--ac2)}
 .mic-btn.listening{background:var(--rd);border-color:var(--rd);color:#fff}
 
-#send-btn{width:32px;height:32px;background:var(--ac);border:none;border-radius:8px;color:#fff;cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:all .2s;box-shadow:0 0 10px rgba(99,102,241,.3)}
+/* Send arrow / waveform button (ChatGPT style) */
+#send-btn{width:32px;height:32px;background:var(--ac);border:none;border-radius:50%;color:#fff;cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:all .2s;box-shadow:0 0 10px rgba(99,102,241,.3)}
 #send-btn:hover{transform:scale(1.08);background:var(--ac2)}
 #send-btn:active{transform:scale(.95)}
 #send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+#send-btn.is-wave{background:var(--wh);color:var(--bg);box-shadow:none}
+#send-btn.is-wave:hover{background:var(--wh);opacity:.88}
 
 .input-note{font-size:11px;color:var(--tx3);text-align:center;margin-top:8px}
 
@@ -419,67 +422,34 @@ body.light-mode .user-bubble { background: linear-gradient(135deg,var(--ac),#4f4
     max-width: 100%;
     height: auto;
 }
-/* ══ CALL BUTTON ═══════════════════════════════════════════════ */
-.call-btn {
-  display:flex;align-items:center;gap:5px;background:var(--sf2);
-  border:1px solid var(--bd);color:var(--tx2);border-radius:20px;
-  padding:4px 10px;font-size:11px;font-family:'Sora',sans-serif;
-  cursor:pointer;transition:all .2s;
-}
-.call-btn:hover { border-color:#22c55e;color:#22c55e; }
 
-/* ══ FULL-SCREEN CALL UI ═══════════════════════════════════════ */
-.call-screen {
-  position:fixed;inset:0;z-index:1000;
-  background:radial-gradient(circle at 50% 30%, #1a1a2e, #0a0a0f 70%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  color:#fff;
-}
-.call-top { position:absolute;top:24px;left:0;right:0;text-align:center; }
-.call-brand { font-size:16px;font-weight:600;color:rgba(255,255,255,.7); }
+/* ══ FULL-SCREEN VOICE CONVERSATION ═════════════════════════════ */
+.call-screen{position:fixed;inset:0;z-index:1000;background:radial-gradient(circle at 50% 35%,#1b1b36,#0a0a0f 72%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;padding:0 20px}
+.call-top{position:absolute;top:calc(20px + env(safe-area-inset-top));left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:10px}
+.call-brand{font-size:16px;font-weight:600;color:rgba(255,255,255,.75)}
+.call-lang{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:20px;padding:6px 14px;font-size:12px;font-family:'Sora',sans-serif;outline:none;cursor:pointer}
+.call-lang option{color:#111}
 
-.call-orb-wrap { display:flex;align-items:center;justify-content:center;margin-bottom:32px; }
-.call-orb {
-  width:140px;height:140px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%, #8b85ff, #6c63ff 60%, #4f46e5);
-  box-shadow:0 0 60px rgba(108,99,255,.5);
-  transition:transform .25s ease, box-shadow .25s ease;
-}
-.call-orb.listening { animation:orbPulseListen 1.6s ease-in-out infinite; }
-.call-orb.speaking  { animation:orbPulseSpeak 0.9s ease-in-out infinite; }
-.call-orb.thinking  { animation:orbSpin 1.4s linear infinite; opacity:.85; }
+.call-orb-wrap{display:flex;align-items:center;justify-content:center;margin-bottom:36px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.call-orb{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#a5a0ff,#6c63ff 58%,#4338ca);box-shadow:0 0 70px rgba(108,99,255,.55);transition:opacity .25s,filter .25s,box-shadow .25s}
+.call-orb.listening{animation:orbListen 1.8s ease-in-out infinite}
+.call-orb.thinking{animation:orbThink 1.2s ease-in-out infinite}
+.call-orb.speaking{animation:orbSpeak .8s ease-in-out infinite}
+.call-orb.muted{opacity:.35;filter:grayscale(.6);box-shadow:none}
+@keyframes orbListen{0%,100%{transform:scale(1)}50%{transform:scale(1.07);box-shadow:0 0 95px rgba(108,99,255,.75)}}
+@keyframes orbThink{0%,100%{transform:scale(.94);opacity:.7}50%{transform:scale(1);opacity:1}}
+@keyframes orbSpeak{0%,100%{transform:scale(1.02)}50%{transform:scale(1.15);box-shadow:0 0 115px rgba(139,133,255,.9)}}
 
-@keyframes orbPulseListen {
-  0%,100% { transform:scale(1); box-shadow:0 0 60px rgba(108,99,255,.5); }
-  50%     { transform:scale(1.08); box-shadow:0 0 90px rgba(108,99,255,.75); }
-}
-@keyframes orbPulseSpeak {
-  0%,100% { transform:scale(1.02); box-shadow:0 0 70px rgba(139,133,255,.7); }
-  50%     { transform:scale(1.14); box-shadow:0 0 110px rgba(139,133,255,.9); }
-}
-@keyframes orbSpin {
-  0%   { filter:hue-rotate(0deg); }
-  100% { filter:hue-rotate(45deg); }
-}
+.call-status{font-size:15px;font-weight:500;color:rgba(255,255,255,.88);margin-bottom:10px;text-align:center;padding:0 20px}
+.call-transcript{max-width:520px;min-height:48px;text-align:center;font-size:14px;line-height:1.7;color:rgba(255,255,255,.6);padding:0 24px}
 
-.call-status {
-  font-size:15px;font-weight:500;color:rgba(255,255,255,.85);margin-bottom:10px;
-}
-.call-transcript {
-  max-width:480px;text-align:center;font-size:13px;color:rgba(255,255,255,.5);
-  min-height:20px;padding:0 24px;line-height:1.6;
-}
-.call-end-btn {
-  position:absolute;bottom:56px;
-  width:60px;height:60px;border-radius:50%;
-  background:#f43f5e;border:none;color:#fff;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 20px rgba(244,63,94,.4);
-  transition:transform .15s;
-}
-.call-end-btn:hover { transform:scale(1.08); }
-
-@media(max-width:768px) {
-  .call-orb { width:110px;height:110px; }
-  .call-transcript { font-size:12px; }
-}
+.call-controls{position:absolute;bottom:calc(48px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:28px}
+.call-ctrl{width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;cursor:pointer;display:grid;place-items:center;transition:all .15s}
+.call-ctrl:hover{background:rgba(255,255,255,.2)}
+.call-ctrl .mic-slash{display:none}
+.call-ctrl.off{background:#fff;color:#111}
+.call-ctrl.off .mic-slash{display:block}
+.call-end-btn{width:58px;height:58px;border-radius:50%;background:#f43f5e;border:none;color:#fff;cursor:pointer;display:grid;place-items:center;box-shadow:0 4px 20px rgba(244,63,94,.4);transition:transform .15s}
+.call-end-btn:hover{transform:scale(1.08)}
+.call-selects{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+@media(max-width:768px){.call-orb{width:120px;height:120px}.call-transcript{font-size:13px}}
