@@ -1,4 +1,5 @@
-const API  = "/api";   // same address as the page: works locally and on any host
+const API = "https://nexusbot-assistant.up.railway.app/api";
+// const API  = "/api";   // same address as the page: works locally and on any host
 const GCID = "638940044835-r945jm44cf3mhmdmi36f6uroc2nqmnse.apps.googleusercontent.com";   // ← paste your FULL Google Client ID here (ends in .apps.googleusercontent.com)
 
 const BOT_AVATAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22">
