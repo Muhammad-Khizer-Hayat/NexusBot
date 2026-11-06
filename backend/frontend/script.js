@@ -537,11 +537,24 @@ function appendBubble(text, role, scroll=true, msgTime=null, msgTimeFull=null) {
     if (scroll) box.scrollTop = box.scrollHeight;
 }
 
-function parseImageCard(text) {
-    const m = text.match(/\[IMAGE\]([\s\S]*?)\[\/IMAGE\]/);
-    return m ? m[1].trim() : null;
-}
+   // Images made by this server live under /static/. Always load them from the SAME site the page came from,
+   // so they use the same https/host as the page (no http://<ip> mixed-content errors).
+   function normalizeImageUrl(u) {
+       if (!u) return u;
+       u = u.trim();
+       if (u.startsWith("data:") || u.startsWith("blob:")) return u;
+       try {
+           const p = new URL(u, location.href);
+           if (p.pathname.startsWith("/static/")) return p.pathname + p.search;
+           if (location.protocol === "https:" && p.protocol === "http:") { p.protocol = "https:"; return p.href; }
+           return p.href;
+       } catch { return u; }
+   }
 
+   function parseImageCard(text) {
+       const m = text.match(/\[IMAGE\]([\s\S]*?)\[\/IMAGE\]/);
+       return m ? normalizeImageUrl(m[1].trim()) : null;
+   }
 function buildImageCard(imageUrl) {
     const cardId = "imgcard_" + Math.random().toString(36).slice(2,8);
     const modal = document.createElement("div");
@@ -624,7 +637,7 @@ function buildImageCard(imageUrl) {
     };
     return `
     <div class="image-card" style="max-width:512px;">
-        <div style="position:relative;cursor:pointer;" onclick="document.getElementById('${cardId}_modal').style.display='flex'">
+           <div class="img-wrap" style="position:relative;cursor:pointer;" onclick="document.getElementById('${cardId}_modal').style.display='flex'">
             <img src="${imageUrl}"
                 id="${cardId}_thumb"
                 style="width:100%;border-radius:16px;display:block;opacity:0;transition:opacity 0.4s;"
@@ -647,42 +660,33 @@ function buildImageCard(imageUrl) {
     </div>`;
 }
 
-function handleImgError(img, originalUrl) {
-    const retries = parseInt(img.dataset.retries || 0);
-    if (retries < 3) {
-        img.dataset.retries = retries + 1;
-        setTimeout(() => {
-            const sep = originalUrl.includes("?") ? "&" : "?";
-            img.src = originalUrl + sep + "_retry=" + Date.now();
-        }, 2000 * (retries + 1));
-        img.parentElement.innerHTML = `
-            <div style="padding:20px;text-align:center;color:#aaa;border-radius:12px;background:#1a1a1a;">
-                <div style="font-size:24px;margin-bottom:8px;">🎨</div>
-                <div>Generating image... please wait</div>
-                <div style="font-size:12px;margin-top:6px;opacity:0.6;">Attempt ${retries + 1}/3</div>
-            </div>`;
-        setTimeout(() => {
-            const newImg = document.createElement("img");
-            newImg.src = originalUrl + (originalUrl.includes("?") ? "&" : "?") + "_r=" + Date.now();
-            newImg.style.cssText = "width:100%;border-radius:16px;display:block;opacity:0;transition:opacity 0.4s;";
-            newImg.dataset.retries = retries + 1;
-            newImg.onload = () => { newImg.style.opacity = "1"; };
-            newImg.onerror = () => handleImgError(newImg, originalUrl);
-            img.parentElement.replaceWith((() => { const d = document.createElement("div"); d.style.cssText="position:relative;cursor:pointer;"; d.appendChild(newImg); return d; })());
-        }, 2000 * (retries + 1) + 100);
-    } else {
-        img.parentElement.innerHTML = `
-            <div style="padding:20px;text-align:center;border-radius:12px;background:#1a1a1a;">
-                <div style="font-size:32px;margin-bottom:8px;">🖼️</div>
-                <div style="color:#ccc;margin-bottom:12px;">Image ready — click to view</div>
-                <a href="${originalUrl}" target="_blank" 
-                   style="background:#7c6ef7;color:#fff;padding:8px 20px;border-radius:8px;
-                   text-decoration:none;font-size:14px;font-weight:600;">
-                   Open Image ↗
-                </a>
-            </div>`;
-    }
-}
+   // Called by the <img onerror>. Retries the SAME <img> up to 2 times, then shows a clear message.
+   function handleImgError(img, originalUrl) {
+       const box = img.closest(".img-wrap") || img.parentElement;
+       if (!box || box.dataset.failed) return;
+       const tries = parseInt(box.dataset.tries || "0", 10);
+
+       if (tries >= 2) {
+           box.dataset.failed = "1";
+           box.removeAttribute("onclick");
+           box.style.cursor = "default";
+           box.innerHTML = `
+               <div style="padding:18px;text-align:center;border-radius:12px;background:#1a1a1a;color:#ccc;">
+                   <div style="font-size:28px;margin-bottom:6px;">🖼️</div>
+                   <div style="margin-bottom:10px;">The image could not be loaded.</div>
+                   <a href="${originalUrl}" target="_blank" rel="noopener"
+                      style="background:#7c6ef7;color:#fff;padding:7px 18px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">Open image ↗</a>
+               </div>`;
+           return;
+       }
+
+       box.dataset.tries = String(tries + 1);
+       setTimeout(() => {
+           if (!box.isConnected || box.dataset.failed) return;
+           const sep = originalUrl.includes("?") ? "&" : "?";
+           img.src = originalUrl + sep + "_retry=" + (tries + 1);
+       }, 1500 * (tries + 1));
+   }
 
 async function downloadGeneratedImage(imageUrl, cardId) {
     try {
